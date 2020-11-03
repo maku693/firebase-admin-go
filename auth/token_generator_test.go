@@ -269,6 +269,10 @@ type mockSigner struct {
 	err error
 }
 
+func (s *mockSigner) Algorithm() string {
+	return ""
+}
+
 func (s *mockSigner) Email(ctx context.Context) (string, error) {
 	return "", nil
 }

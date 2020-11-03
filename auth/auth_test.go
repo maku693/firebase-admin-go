@@ -682,7 +682,7 @@ func TestCustomTokenVerification(t *testing.T) {
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	tv, err := newIDTokenVerifier(context.Background(), testProjectID)
+	tv, err := newIDTokenVerifier(context.Background(), testProjectID, "TODO", "TODO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1022,7 +1022,7 @@ func signerForTests(ctx context.Context) (cryptoSigner, error) {
 }
 
 func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
-	tv, err := newIDTokenVerifier(ctx, testProjectID)
+	tv, err := newIDTokenVerifier(ctx, testProjectID, "TODO", "TODO")
 	if err != nil {
 		return nil, err
 	}
@@ -1036,7 +1036,7 @@ func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
 }
 
 func cookieVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
-	tv, err := newSessionCookieVerifier(ctx, testProjectID)
+	tv, err := newSessionCookieVerifier(ctx, testProjectID, "TODO", "TODO")
 	if err != nil {
 		return nil, err
 	}
@@ -1164,6 +1164,7 @@ func checkCookieVerifier(tv *tokenVerifier, projectID string) error {
 
 func checkBaseClient(client *Client, wantProjectID string) error {
 	umc := client.baseClient
+	// TODO: Remove endpoint check?
 	if umc.userManagementEndpoint != idToolkitV1Endpoint {
 		return fmt.Errorf("userManagementEndpoint = %q; want = %q", umc.userManagementEndpoint, idToolkitV1Endpoint)
 	}

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 
 const (
 	authErrorCode    = "authErrorCode"
+	defaultAuthURL   = "https://identitytoolkit.googleapis.com/"
 	firebaseAudience = "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit"
 	oneHourInSeconds = 3600
 
@@ -62,14 +64,30 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		err    error
 	)
 
-	creds, _ := transport.Creds(ctx, conf.Opts...)
+	baseURL := defaultAuthURL
+	if authEmulatorHost := os.Getenv("FIREBASE_AUTH_EMULATOR_HOST"); authEmulatorHost != "" {
+		baseURL = fmt.Sprintf("http://%s/identitytoolkit.googleapis.com/", authEmulatorHost)
+		signer = emulatedSigner{}
+	}
 
-	// Initialize a signer by following the go/firebase-admin-sign protocol.
-	if creds != nil && len(creds.JSON) > 0 {
-		// If the SDK was initialized with a service account, use it to sign bytes.
-		signer, err = signerFromCreds(creds.JSON)
-		if err != nil && err != errNotAServiceAcct {
-			return nil, err
+	idToolkitV1Endpoint := fmt.Sprintf("%s/v1", baseURL)
+	idToolkitV2Beta1Endpoint := fmt.Sprintf("%s/v2beta1", baseURL)
+	userManagementEndpoint := idToolkitV1Endpoint
+	providerConfigEndpoint := idToolkitV2Beta1Endpoint
+	tenantMgtEndpoint := idToolkitV2Beta1Endpoint
+
+	tokenAudience := fmt.Sprintf("%s/google.identity.identitytoolkit.v1.IdentityToolkit", baseURL)
+
+	if signer == nil {
+		creds, _ := transport.Creds(ctx, conf.Opts...)
+
+		// Initialize a signer by following the go/firebase-admin-sign protocol.
+		if creds != nil && len(creds.JSON) > 0 {
+			// If the SDK was initialized with a service account, use it to sign bytes.
+			signer, err = signerFromCreds(creds.JSON)
+			if err != nil && err != errNotAServiceAcct {
+				return nil, err
+			}
 		}
 	}
 
@@ -91,12 +109,12 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		}
 	}
 
-	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID)
+	idTokenVerifier, err := newIDTokenVerifier(ctx, conf.ProjectID, tokenAudience, signer.Algorithm())
 	if err != nil {
 		return nil, err
 	}
 
-	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID)
+	cookieVerifier, err := newSessionCookieVerifier(ctx, conf.ProjectID, tokenAudience, signer.Algorithm())
 	if err != nil {
 		return nil, err
 	}
@@ -113,8 +131,9 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 	}
 
 	base := &baseClient{
-		userManagementEndpoint: idToolkitV1Endpoint,
+		userManagementEndpoint: userManagementEndpoint,
 		providerConfigEndpoint: providerConfigEndpoint,
+		tenantMgtEndpoint:      tenantMgtEndpoint,
 		projectID:              conf.ProjectID,
 		httpClient:             hc,
 		idTokenVerifier:        idTokenVerifier,
@@ -177,11 +196,11 @@ func (c *baseClient) CustomTokenWithClaims(ctx context.Context, uid string, devC
 
 	now := c.clock.Now().Unix()
 	info := &jwtInfo{
-		header: jwtHeader{Algorithm: "RS256", Type: "JWT"},
+		header: jwtHeader{Algorithm: c.signer.Algorithm(), Type: "JWT"},
 		payload: &customToken{
 			Iss:      iss,
 			Sub:      iss,
-			Aud:      firebaseAudience,
+			Aud:      c.tokenAudience,
 			UID:      uid,
 			Iat:      now,
 			Exp:      now + oneHourInSeconds,
@@ -234,9 +253,11 @@ type FirebaseInfo struct {
 type baseClient struct {
 	userManagementEndpoint string
 	providerConfigEndpoint string
+	tenantMgtEndpoint      string
 	projectID              string
 	tenantID               string
 	httpClient             *internal.HTTPClient
+	tokenAudience          string
 	idTokenVerifier        *tokenVerifier
 	cookieVerifier         *tokenVerifier
 	signer                 cryptoSigner

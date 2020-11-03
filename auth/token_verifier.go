@@ -95,14 +95,16 @@ type tokenVerifier struct {
 	articledShortName string
 	docURL            string
 	projectID         string
+	audience          string
 	issuerPrefix      string
 	invalidTokenCode  string
 	expiredTokenCode  string
+	algorithm         string
 	keySource         keySource
 	clock             internal.Clock
 }
 
-func newIDTokenVerifier(ctx context.Context, projectID string) (*tokenVerifier, error) {
+func newIDTokenVerifier(ctx context.Context, projectID string, audience string, algorithm string) (*tokenVerifier, error) {
 	noAuthHTTPClient, _, err := transport.NewHTTPClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return nil, err
@@ -113,15 +115,17 @@ func newIDTokenVerifier(ctx context.Context, projectID string) (*tokenVerifier, 
 		articledShortName: "an ID token",
 		docURL:            "https://firebase.google.com/docs/auth/admin/verify-id-tokens",
 		projectID:         projectID,
+		audience:          audience,
 		issuerPrefix:      idTokenIssuerPrefix,
 		invalidTokenCode:  idTokenInvalid,
 		expiredTokenCode:  idTokenExpired,
+		algorithm:         algorithm,
 		keySource:         newHTTPKeySource(idTokenCertURL, noAuthHTTPClient),
 		clock:             internal.SystemClock,
 	}, nil
 }
 
-func newSessionCookieVerifier(ctx context.Context, projectID string) (*tokenVerifier, error) {
+func newSessionCookieVerifier(ctx context.Context, projectID string, audience string, algorithm string) (*tokenVerifier, error) {
 	noAuthHTTPClient, _, err := transport.NewHTTPClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return nil, err
@@ -132,9 +136,11 @@ func newSessionCookieVerifier(ctx context.Context, projectID string) (*tokenVeri
 		articledShortName: "a session cookie",
 		docURL:            "https://firebase.google.com/docs/auth/admin/manage-cookies",
 		projectID:         projectID,
+		audience:          audience,
 		issuerPrefix:      sessionCookieIssuerPrefix,
 		invalidTokenCode:  sessionCookieInvalid,
 		expiredTokenCode:  sessionCookieExpired,
+		algorithm:         algorithm,
 		keySource:         newHTTPKeySource(sessionCookieCertURL, noAuthHTTPClient),
 		clock:             internal.SystemClock,
 	}, nil
@@ -263,14 +269,14 @@ func (tv *tokenVerifier) verifyHeaderAndBody(token string) (*Token, error) {
 
 	issuer := tv.issuerPrefix + tv.projectID
 	if header.KeyID == "" {
-		if payload.Audience == firebaseAudience {
+		if payload.Audience == tv.audience {
 			return nil, fmt.Errorf("expected %s but got a custom token", tv.articledShortName)
 		}
 		return nil, fmt.Errorf("%s has no 'kid' header", tv.shortName)
 	}
-	if header.Algorithm != "RS256" {
-		return nil, fmt.Errorf("%s has invalid algorithm; expected 'RS256' but got %q",
-			tv.shortName, header.Algorithm)
+	if header.Algorithm != tv.algorithm {
+		return nil, fmt.Errorf("%s has invalid algorithm; expected %s but got %q",
+			tv.shortName, tv.algorithm, header.Algorithm)
 	}
 	if payload.Audience != tv.projectID {
 		return nil, fmt.Errorf("%s has invalid 'aud' (audience) claim; expected %q but got %q; %s",
