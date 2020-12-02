@@ -66,7 +66,7 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 
 	baseURL := defaultAuthURL
 	if authEmulatorHost := os.Getenv("FIREBASE_AUTH_EMULATOR_HOST"); authEmulatorHost != "" {
-		baseURL = fmt.Sprintf("http://%s/identitytoolkit.googleapis.com/", authEmulatorHost)
+		baseURL = fmt.Sprintf("http://%s/identitytoolkit.googleapis.com", authEmulatorHost)
 		signer = emulatedSigner{}
 	}
 
