@@ -272,7 +272,9 @@ func (tv *tokenVerifier) verifyHeaderAndBody(token string) (*Token, error) {
 		if payload.Audience == tv.audience {
 			return nil, fmt.Errorf("expected %s but got a custom token", tv.articledShortName)
 		}
-		return nil, fmt.Errorf("%s has no 'kid' header", tv.shortName)
+		if header.Algorithm != algorithmNone {
+			return nil, fmt.Errorf("%s has no 'kid' header", tv.shortName)
+		}
 	}
 	if header.Algorithm != tv.algorithm {
 		return nil, fmt.Errorf("%s has invalid algorithm; expected %s but got %q",
@@ -312,6 +314,9 @@ func (tv *tokenVerifier) verifySignatureWithKeys(ctx context.Context, token stri
 	segments := strings.Split(token, ".")
 	var h jwtHeader
 	decode(segments[0], &h)
+	if h.Algorithm == algorithmNone {
+		return true
+	}
 
 	verified := false
 	for _, k := range keys {
