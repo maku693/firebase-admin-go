@@ -98,11 +98,12 @@ type tokenVerifier struct {
 	issuerPrefix      string
 	invalidTokenCode  string
 	expiredTokenCode  string
+	algorithm         string
 	keySource         keySource
 	clock             internal.Clock
 }
 
-func newIDTokenVerifier(ctx context.Context, projectID string) (*tokenVerifier, error) {
+func newIDTokenVerifier(ctx context.Context, projectID string, algorithm string) (*tokenVerifier, error) {
 	noAuthHTTPClient, _, err := transport.NewHTTPClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return nil, err
@@ -116,6 +117,7 @@ func newIDTokenVerifier(ctx context.Context, projectID string) (*tokenVerifier, 
 		issuerPrefix:      idTokenIssuerPrefix,
 		invalidTokenCode:  idTokenInvalid,
 		expiredTokenCode:  idTokenExpired,
+		algorithm:         algorithm,
 		keySource:         newHTTPKeySource(idTokenCertURL, noAuthHTTPClient),
 		clock:             internal.SystemClock,
 	}, nil
@@ -268,9 +270,9 @@ func (tv *tokenVerifier) verifyHeaderAndBody(token string) (*Token, error) {
 		}
 		return nil, fmt.Errorf("%s has no 'kid' header", tv.shortName)
 	}
-	if header.Algorithm != "RS256" {
-		return nil, fmt.Errorf("%s has invalid algorithm; expected 'RS256' but got %q",
-			tv.shortName, header.Algorithm)
+	if header.Algorithm != tv.algorithm {
+		return nil, fmt.Errorf("%s has invalid algorithm; expected %s but got %q",
+			tv.shortName, tv.algorithm, header.Algorithm)
 	}
 	if payload.Audience != tv.projectID {
 		return nil, fmt.Errorf("%s has invalid 'aud' (audience) claim; expected %q but got %q; %s",

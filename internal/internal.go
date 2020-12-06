@@ -38,6 +38,7 @@ var SystemClock = &systemClock{}
 // AuthConfig represents the configuration of Firebase Auth service.
 type AuthConfig struct {
 	Opts             []option.ClientOption
+	URL              string
 	ProjectID        string
 	ServiceAccountID string
 	Version          string

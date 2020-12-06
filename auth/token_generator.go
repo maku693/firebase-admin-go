@@ -88,6 +88,7 @@ type serviceAccount struct {
 
 // cryptoSigner is used to cryptographically sign data, and query the identity of the signer.
 type cryptoSigner interface {
+	Algorithm() string
 	Sign(context.Context, []byte) ([]byte, error)
 	Email(context.Context) (string, error)
 }
@@ -133,6 +134,10 @@ func newServiceAccountSigner(sa serviceAccount) (*serviceAccountSigner, error) {
 	}, nil
 }
 
+func (s serviceAccountSigner) Algorithm() string {
+	return "RS256"
+}
+
 func (s serviceAccountSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
 	hash := sha256.New()
 	hash.Write(b)
@@ -171,6 +176,10 @@ func newIAMSigner(ctx context.Context, config *internal.AuthConfig) (*iamSigner,
 		metadataHost: "http://metadata.google.internal",
 		iamHost:      "https://iamcredentials.googleapis.com",
 	}, nil
+}
+
+func (s iamSigner) Algorithm() string {
+	return "RS256"
 }
 
 func (s iamSigner) Sign(ctx context.Context, b []byte) ([]byte, error) {
@@ -244,4 +253,18 @@ func (s iamSigner) callMetadataService(ctx context.Context) (string, error) {
 	}
 
 	return result, nil
+}
+
+type emulatedSigner struct{}
+
+func (s emulatedSigner) Algorithm() string {
+	return "none"
+}
+
+func (s emulatedSigner) Sign(context.Context, []byte) ([]byte, error) {
+	return []byte(""), nil
+}
+
+func (s emulatedSigner) Email(context.Context) (string, error) {
+	return "firebase-auth-emulator@example.com", nil
 }

@@ -682,7 +682,7 @@ func TestCustomTokenVerification(t *testing.T) {
 }
 
 func TestCertificateRequestError(t *testing.T) {
-	tv, err := newIDTokenVerifier(context.Background(), testProjectID)
+	tv, err := newIDTokenVerifier(context.Background(), testProjectID, "TODO")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1022,7 +1022,7 @@ func signerForTests(ctx context.Context) (cryptoSigner, error) {
 }
 
 func idTokenVerifierForTests(ctx context.Context) (*tokenVerifier, error) {
-	tv, err := newIDTokenVerifier(ctx, testProjectID)
+	tv, err := newIDTokenVerifier(ctx, testProjectID, "RS256")
 	if err != nil {
 		return nil, err
 	}
