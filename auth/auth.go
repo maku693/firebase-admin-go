@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"firebase.google.com/go/v4/internal"
+	"golang.org/x/oauth2"
+	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 )
 
@@ -113,7 +115,11 @@ func NewClient(ctx context.Context, conf *internal.AuthConfig) (*Client, error) 
 		return nil, err
 	}
 
-	transport, _, err := transport.NewHTTPClient(ctx, conf.Opts...)
+	transportOpts := conf.Opts
+	if isEmulator {
+		transportOpts = append(transportOpts, option.WithTokenSource(authEmulatorTokenSource{}))
+	}
+	transport, _, err := transport.NewHTTPClient(ctx, transportOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -430,4 +436,10 @@ func hasAuthErrorCode(err error, code string) bool {
 
 	got, ok := fe.Ext[authErrorCode]
 	return ok && got == code
+}
+
+type authEmulatorTokenSource struct{}
+
+func (ts authEmulatorTokenSource) Token() (*oauth2.Token, error) {
+	return &oauth2.Token{AccessToken: "owner"}, nil
 }

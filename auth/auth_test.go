@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"syscall"
@@ -293,15 +294,16 @@ func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 	defer os.Unsetenv(emulatorHostEnvVar)
 
 	conf := &internal.AuthConfig{
-		Opts: []option.ClientOption{
-			option.WithoutAuthentication(),
-		},
+		ProjectID: testProjectID,
 	}
 	client, err := NewClient(context.Background(), conf)
 	if err != nil {
 		t.Fatal(err)
 	}
 	baseClient := client.baseClient
+	if baseClient.projectID != testProjectID {
+		t.Errorf("baseClient.projectID = %q; want = %q", baseClient.projectID, testProjectID)
+	}
 	if baseClient.userManagementEndpoint != idToolkitV1Endpoint {
 		t.Errorf("baseClient.userManagementEndpoint = %q; want = %q", baseClient.userManagementEndpoint, idToolkitV1Endpoint)
 	}
@@ -313,6 +315,22 @@ func TestNewClientEmulatorHostEnvVar(t *testing.T) {
 	}
 	if _, ok := baseClient.signer.(emulatedSigner); !ok {
 		t.Errorf("baseClient.signer = %#v; want = %#v", baseClient.signer, emulatedSigner{})
+	}
+
+	var bearer string
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bearer = r.Header.Get("Authorization")
+	}))
+	defer service.Close()
+	_, err = baseClient.httpClient.Do(context.Background(), &internal.Request{
+		Method: http.MethodGet,
+		URL:    service.URL,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bearer != "Bearer owner" {
+		t.Errorf("Bearer token: %q; want: %q", bearer, "Bearer owner")
 	}
 }
 
